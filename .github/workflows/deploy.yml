@@ -56,6 +56,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       DEPLOY_URL: ${{ needs.deploy.outputs.deploy-url }}
+      # secrets 上下文不能直接用于 step if，先经 env 中转（env 支持 secrets）
+      HAS_ADMIN_TOKEN: ${{ secrets.DUJIE_ADMIN_TOKEN != '' }}
     steps:
       - name: 公开面 — GET /api/config 200
         run: |
@@ -85,7 +87,7 @@ jobs:
           echo "HTTP $code（期望 401）"
           [ "$code" = "401" ] || exit 1
       - name: 管理面 — 带 token → 200 并清理冒烟评论
-        if: ${{ secrets.DUJIE_ADMIN_TOKEN != '' }}
+        if: ${{ env.HAS_ADMIN_TOKEN == 'true' }}
         env:
           ADMIN_TOKEN: ${{ secrets.DUJIE_ADMIN_TOKEN }}
         run: |
