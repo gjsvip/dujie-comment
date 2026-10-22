@@ -52,7 +52,7 @@ function usesNumberedParams(sql: string): boolean {
 }
 
 class SqliteD1 {
-  private db: DatabaseSync
+  private db: InstanceType<typeof DatabaseSync>
   constructor(schemaSql: string) {
     this.db = new DatabaseSync(':memory:')
     this.db.exec(schemaSql)
@@ -176,7 +176,7 @@ function makeCtx(): Ctx {
       }
       if (init.admin) headers[ADMIN_TOKEN_HEADER] = ADMIN_TOKEN
       if (init.body !== undefined && !headers['Content-Type']) headers['Content-Type'] = 'application/json'
-      return app.request(path, { ...init, headers }, env, execCtx)
+      return Promise.resolve(app.request(path, { ...init, headers }, env, execCtx))
     },
   }
 }
@@ -256,13 +256,13 @@ describe('集成：公开 API 链路', () => {
     expect(body.data.status).toBe('approved')
     expect(body.data.id).toBeGreaterThan(0)
 
-    const row = ctx.db.prepare('SELECT nickname, status FROM comments WHERE id = ?1').bind(body.data.id).first<{
+    const row = await ctx.db.prepare('SELECT nickname, status FROM comments WHERE id = ?1').bind(body.data.id).first<{
       nickname: string
       status: string
     }>()
     expect(row).toMatchObject({ nickname: '新访客', status: 'approved' })
     // 通知邮箱隔离存放
-    const email = ctx.db
+    const email = await ctx.db
       .prepare('SELECT email FROM comment_emails WHERE comment_id = ?1')
       .bind(body.data.id)
       .first<{ email: string }>()
@@ -516,7 +516,7 @@ describe('集成：管理 API 链路', () => {
     expect(del.status).toBe(200)
     const body = (await json(del)) as unknown as { data: { childrenPromoted: number } }
     expect(body.data.childrenPromoted).toBe(1)
-    const child = ctx.db
+    const child = await ctx.db
       .prepare('SELECT parent_id FROM comments WHERE id = 2')
       .first<{ parent_id: number | null }>()
     expect(child?.parent_id).toBe(null)
@@ -556,8 +556,8 @@ describe('集成：回复通知旁路（Resend）', () => {
       body: JSON.stringify({ slug: 'demo-post-1', nickname: '通知测试', content: '集成测试回复', parentId: 1 }),
     })
     expect(res.status).toBe(201)
-    // waitUntil 在测试环境同步刷新：fetch 已被调用
-    await new Promise((r) => setTimeout(r, 10))
+    // flush waitUntil 后台任务（通知旁路）
+    await Promise.all(ctx.pending.splice(0))
     expect(fetchSpy).toHaveBeenCalledTimes(1)
   })
 
@@ -572,7 +572,7 @@ describe('集成：回复通知旁路（Resend）', () => {
       body: JSON.stringify({ slug: 'demo-post-1', nickname: '无 key', content: 'x', parentId: 1 }),
     })
     expect(res.status).toBe(201)
-    await new Promise((r) => setTimeout(r, 10))
+    await Promise.all(ctx.pending.splice(0))
     expect(fetchSpy).not.toHaveBeenCalled()
   })
 })
