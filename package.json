@@ -1,0 +1,31 @@
+{
+  "name": "dujie-comment",
+  "version": "1.0.0",
+  "description": "dujie-comment —— Cloudflare Workers + D1 的零成本评论托管服务，fork → wrangler deploy 两条命令上线",
+  "license": "MIT",
+  "type": "module",
+  "keywords": [
+    "cloudflare-workers",
+    "d1",
+    "comment-system",
+    "hono",
+    "serverless"
+  ],
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "db:init": "wrangler d1 execute DB --file=schema.sql --remote"
+  },
+  "dependencies": {
+    "hono": "^4.6.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.0.0",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.5.0",
+    "vitest": "^2.0.0",
+    "wrangler": "^3.114.0"
+  }
+}

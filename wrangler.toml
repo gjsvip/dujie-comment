@@ -1,0 +1,91 @@
+# dujie-comment —— Cloudflare Workers + D1 零成本评论系统
+# 文档：docs/deploy.md（部署）/ docs/api.md（API 契约）
+#
+# 本文件附带的是「在线演示实例」的资源 ID（公开信息，可安全入 git）。
+# Fork 后请把 account_id / database_id / kv id / bucket_name 换成你自己的资源，
+# 三条命令创建：
+#   npx wrangler d1 create dujie-comment-db
+#   npx wrangler kv namespace create dujie-comment-kv
+#   npx wrangler r2 bucket create dujie-comment-backup
+
+name = "dujie-comment"
+main = "worker/index.ts"
+compatibility_date = "2026-10-01"
+compatibility_flags = ["nodejs_compat"]
+
+# 改成你的 CF 账号 ID（CF 官网 → Workers & Pages → 右侧）
+account_id = "f608546bec281f207409d11f3be5c89d"
+
+# 周一 02:00 UTC（北京时间周一 10:00）周备份 comments+says 全量到 R2
+[triggers]
+crons = ["0 2 * * 1"]
+
+# 文本模块规则：把自带前端文件（client/ 嵌入组件、admin/ 后台、demo/ 演示页）
+# 作为字符串内联进 bundle，Worker 因此可直接托管它们（见 worker/routes/static.ts）。
+# 这是 wrangler 官方 [rules] 机制；fallthrough = true 表示与内置 Text 规则
+# （**/*.txt、**/*.html）叠加而非取代。
+[[rules]]
+type = "Text"
+globs = ["**/client/dujie-comment.js", "**/client/dujie-comment.css"]
+fallthrough = true
+
+# D1：评论 / 点赞 / 浏览量 / 说说 / 黑名单 / 通知邮箱
+[[d1_databases]]
+binding = "DB"
+database_name = "dujie-comment-db"
+database_id = "3638a498-7739-44b9-8b2b-475fa8d0dd8f"
+# 同 KV：演示实例 dev 直连真实库（本地调试即操作演示数据）
+preview_database_id = "3638a498-7739-44b9-8b2b-475fa8d0dd8f"
+
+# KV：配置开关 / 限流计数 / 管理令牌哈希 / 备份状态标记
+[[kv_namespaces]]
+binding = "KV"
+id = "93b4c6c5f753448db852b489537e5d77"
+# preview_id 是 `wrangler dev` 必需项。演示实例刻意指向同一命名空间
+# （dev 即操作真实数据，方便本地调试演示数据）；
+# 生产部署建议另建预览命名空间：wrangler kv namespace create <name> --preview
+preview_id = "93b4c6c5f753448db852b489537e5d77"
+
+# R2：周备份 JSON（保留最近 12 份）
+[[r2_buckets]]
+binding = "R2"
+bucket_name = "dujie-comment-backup"
+# 同 KV/D1：演示实例 dev 直连真实桶
+preview_bucket_name = "dujie-comment-backup"
+
+# 模块规则：把 client/ 下的 dujie-comment.js / .css 按「文本模块」内联进 bundle
+# （wrangler 默认只把 *.txt / *.html 当文本模块，.js 会走 esbuild 当成真 JS 模块，
+# 导致 import default 失败）。注意 glob 匹配的是「import 语句里的书写路径」
+# （如 '../../client/dujie-comment.js'），不是磁盘路径，所以用 **/ 前缀通配。
+# fallthrough=true 表示本规则不排他，默认的 *.txt / *.html 文本规则继续生效。
+[[rules]]
+type = "Text"
+globs = ["**/client/dujie-comment.js", "**/client/dujie-comment.css"]
+fallthrough = true
+
+[vars]
+# CORS 白名单（逗号分隔）：允许哪些域的页面跨源调用本 API。
+# 演示实例放行了 520691.xyz；换成你自己的站点域名。localhost 恒允许（调试用）。
+CORS_ORIGINS = "https://www.520691.xyz"
+
+# 站点名称（通知邮件主题/署名）
+SITE_NAME = "dujie-comment"
+# 站点主页（通知邮件署名；可空）
+SITE_URL = "https://dujie-comment.dujie.workers.dev"
+# 文章 URL 前缀（通知邮件「查看完整讨论」链接 = {POST_URL_BASE}{slug}；可空，空则回退 SITE_URL）
+POST_URL_BASE = "https://dujie-comment.dujie.workers.dev/demo?slug="
+
+# 通知邮件发件人（缺省 dujie-comment <onboarding@resend.dev>；
+# 生产请在 Resend 后台验证域名后改成 <something@your-domain>）
+# MAIL_FROM = "dujie-comment <noreply@example.com>"
+
+# 访客指纹盐（缺省 dujie-comment；仅新部署时设置，改动会使历史限流/点赞指纹失效）
+# VISITOR_SALT = "dujie-comment"
+
+# Turnstile 站点密钥（公开值，可入 git；可被 KV cfg:turnstile_site_key 覆盖）。
+# 在 CF 官网 → Turnstile → 添加站点 后填入；留空则人机校验不渲染（开关打开也无效）。
+TURNSTILE_SITE_KEY = ""
+
+# 以下为敏感项，请用 `npx wrangler secret put <NAME>` 注入，不要写进本文件：
+#   TURNSTILE_SECRET   Turnstile 服务端密钥（缺失时校验自动放行并 WARN）
+#   RESEND_API_KEY     Resend API Key（缺失时回复通知自动降级跳过，不影响评论）

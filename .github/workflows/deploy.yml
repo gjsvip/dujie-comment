@@ -1,0 +1,107 @@
+name: Deploy dujie-comment
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npm test
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    outputs:
+      deploy-url: ${{ steps.resolve.outputs.url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      # 在仓库 Settings → Secrets 配置：
+      #   CLOUDFLARE_API_TOKEN  部署令牌（Workers 脚本编辑权，wrangler.toml 已含 account_id）
+      #   CLOUDFLARE_ACCOUNT_ID CF 账号 ID
+      - name: Deploy to Cloudflare Workers
+        id: deploy
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy
+      # 从 wrangler 输出提取本次部署的 URL（workers.dev 子域），供冒烟测试使用
+      - name: Resolve deployed URL
+        id: resolve
+        run: |
+          URL=$(printf '%s' "${{ steps.deploy.outputs.command-output }}" | grep -oE 'https://[a-z0-9-]+\.workers\.dev' | head -1)
+          if [ -z "$URL" ]; then
+            echo "::warning::未能从部署输出解析 URL，冒烟测试回退默认演示地址"
+            URL="https://dujie-comment.dujie.workers.dev"
+          fi
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          echo "部署地址：$URL"
+
+  # 冒烟测试：在 GitHub Actions 网络环境下验证线上实例（对本仓库即演示实例）。
+  # 配置仓库 Secret DUJIE_ADMIN_TOKEN 后额外验证管理面；未配置则跳过管理面用例。
+  smoke:
+    needs: deploy
+    runs-on: ubuntu-latest
+    env:
+      DEPLOY_URL: ${{ needs.deploy.outputs.deploy-url }}
+    steps:
+      - name: 公开面 — GET /api/config 200
+        run: |
+          code=$(curl -s -o /tmp/config.json -w '%{http_code}' "$DEPLOY_URL/api/config")
+          echo "HTTP $code"; cat /tmp/config.json; echo
+          [ "$code" = "200" ] || exit 1
+          grep -q '"turnstile"' /tmp/config.json || exit 1
+      - name: 公开面 — GET /api/comments?slug=demo-post-1 200
+        run: |
+          code=$(curl -s -o /tmp/comments.json -w '%{http_code}' "$DEPLOY_URL/api/comments?slug=demo-post-1")
+          echo "HTTP $code"; head -c 400 /tmp/comments.json; echo
+          [ "$code" = "200" ] || exit 1
+          grep -q '"comments"' /tmp/comments.json || exit 1
+      - name: 公开面 — POST /api/comments 201 并记录 ID
+        run: |
+          code=$(curl -s -o /tmp/post.json -w '%{http_code}' -X POST "$DEPLOY_URL/api/comments" \
+            -H 'content-type: application/json' \
+            -H "User-Agent: gh-actions-smoke-$GITHUB_RUN_ID" \
+            -d '{"slug":"demo-post-1","nickname":"CI 冒烟测试","content":"deploy workflow smoke test"}')
+          echo "HTTP $code"; cat /tmp/post.json; echo
+          [ "$code" = "201" ] || exit 1
+          ID=$(node -e "console.log(JSON.parse(require('fs').readFileSync('/tmp/post.json','utf8')).data.id)")
+          echo "SMOKE_COMMENT_ID=$ID" >> "$GITHUB_ENV"
+      - name: 管理面 — 无 token → 401
+        run: |
+          code=$(curl -s -o /dev/null -w '%{http_code}' "$DEPLOY_URL/api/admin/stats")
+          echo "HTTP $code（期望 401）"
+          [ "$code" = "401" ] || exit 1
+      - name: 管理面 — 带 token → 200 并清理冒烟评论
+        if: ${{ secrets.DUJIE_ADMIN_TOKEN != '' }}
+        env:
+          ADMIN_TOKEN: ${{ secrets.DUJIE_ADMIN_TOKEN }}
+        run: |
+          code=$(curl -s -o /tmp/stats.json -w '%{http_code}' "$DEPLOY_URL/api/admin/stats" -H "X-Admin-Token: $ADMIN_TOKEN")
+          echo "HTTP $code"; cat /tmp/stats.json; echo
+          [ "$code" = "200" ] || exit 1
+          # 清理：删除冒烟测试写入的评论（走管理硬删除端点）
+          if [ -n "$SMOKE_COMMENT_ID" ]; then
+            del=$(curl -s -o /tmp/del.json -w '%{http_code}' -X DELETE \
+              "$DEPLOY_URL/api/admin/comments/$SMOKE_COMMENT_ID" -H "X-Admin-Token: $ADMIN_TOKEN")
+            echo "DELETE smoke comment #$SMOKE_COMMENT_ID → HTTP $del"; cat /tmp/del.json; echo
+          fi
+      - name: 静态面 — /admin、/client/dujie-comment.js、/client/dujie-comment.css、/demo 200
+        run: |
+          for p in /admin /client/dujie-comment.js /client/dujie-comment.css /demo; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' "$DEPLOY_URL$p")
+            echo "GET $p → HTTP $code"
+            [ "$code" = "200" ] || exit 1
+          done

@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex,nofollow">
+<title>评论管理 · dujie-comment</title>
+<style>
+  :root {
+    --bg: #0b0f1a; --bg-soft: #111827; --card: #151d2e; --border: #233049;
+    --text: #e5e9f0; --text-2: #9aa7bd; --text-3: #64748b;
+    --accent: #38bdf8; --ok: #34d399; --warn: #fbbf24; --err: #f87171;
+    --grad: linear-gradient(135deg, #38bdf8, #818cf8);
+    --radius: 14px; --radius-sm: 9px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+  .login-wrap { min-height: 100vh; display: grid; place-items: center; padding: 20px; }
+  .login-box { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 36px 32px; width: 100%; max-width: 420px; }
+  .login-box h1 { font-size: 20px; margin-bottom: 6px; }
+  .login-box p { color: var(--text-3); font-size: 13px; margin-bottom: 22px; }
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 12.5px; color: var(--text-2); margin-bottom: 6px; }
+  .field input { width: 100%; background: var(--bg-soft); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); padding: 11px 13px; font-size: 14.5px; outline: none; }
+  .field input:focus { border-color: var(--accent); }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: none; border-radius: var(--radius-sm); padding: 10px 16px; font-size: 13.5px; font-weight: 600; cursor: pointer; min-height: 40px; }
+  .btn-primary { background: var(--grad); color: #fff; width: 100%; }
+  .btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--text-2); }
+  .btn-sm { padding: 6px 11px; font-size: 12.5px; min-height: 34px; }
+  .btn-ok { background: rgba(52,211,153,.14); color: var(--ok); border: 1px solid rgba(52,211,153,.3); }
+  .btn-warn { background: rgba(251,191,36,.12); color: var(--warn); border: 1px solid rgba(251,191,36,.3); }
+  .btn-err { background: rgba(248,113,113,.12); color: var(--err); border: 1px solid rgba(248,113,113,.3); }
+  .btn[disabled] { opacity: .45; pointer-events: none; }
+  .app { display: none; max-width: 1080px; margin: 0 auto; padding: 20px 16px 60px; }
+  .topbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 18px; }
+  .topbar h1 { font-size: 19px; background: var(--grad); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+  .topbar .ops { display: flex; gap: 8px; flex-wrap: wrap; }
+  .api-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; font-size: 12.5px; color: var(--text-3); }
+  .api-bar input { flex: 1; min-width: 220px; background: var(--bg-soft); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); padding: 8px 11px; font-size: 12.5px; outline: none; }
+  .api-bar input:focus { border-color: var(--accent); }
+  .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 18px; }
+  .stat-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 14px 16px; }
+  .stat-card .n { font-size: 24px; font-weight: 800; }
+  .stat-card .t { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+  .stat-card.pending .n { color: var(--warn); }
+  .tabs { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
+  .tab { padding: 8px 14px; border-radius: 999px; border: 1px solid var(--border); background: transparent; color: var(--text-2); font-size: 13px; cursor: pointer; min-height: 38px; }
+  .tab.on { background: var(--grad); color: #fff; border-color: transparent; font-weight: 600; }
+  .filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+  .filters input, .filters select { background: var(--bg-soft); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); padding: 9px 12px; font-size: 13.5px; outline: none; min-height: 40px; }
+  .filters input { flex: 1; min-width: 140px; }
+  .item { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 14px 16px; margin-bottom: 10px; }
+  .item-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 7px; font-size: 12.5px; color: var(--text-3); }
+  .item-head .who { color: var(--text); font-weight: 700; font-size: 14px; }
+  .badge { font-size: 11px; padding: 2px 8px; border-radius: 999px; font-weight: 600; }
+  .badge.approved { background: rgba(52,211,153,.13); color: var(--ok); }
+  .badge.pending { background: rgba(251,191,36,.13); color: var(--warn); }
+  .badge.hidden { background: rgba(100,116,139,.18); color: var(--text-3); }
+  .item-body { font-size: 14px; line-height: 1.65; word-break: break-word; margin-bottom: 9px; white-space: pre-wrap; }
+  .item-meta { font-size: 12px; color: var(--text-3); margin-bottom: 10px; }
+  .item-ops { display: flex; gap: 6px; flex-wrap: wrap; }
+  .pager { display: flex; gap: 8px; align-items: center; justify-content: center; margin-top: 16px; color: var(--text-3); font-size: 13px; flex-wrap: wrap; }
+  .empty { text-align: center; color: var(--text-3); padding: 48px 0; font-size: 14px; }
+  .toast { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); background: var(--card); border: 1px solid var(--accent); padding: 10px 18px; border-radius: 999px; font-size: 13.5px; opacity: 0; pointer-events: none; transition: opacity .25s; z-index: 99; max-width: 88vw; text-align: center; }
+  .toast.show { opacity: 1; }
+  .toast.err { border-color: var(--err); }
+  .hint { font-size: 12px; color: var(--text-3); margin-top: 14px; line-height: 1.7; }
+  @media (max-width: 560px) {
+    .app { padding: 14px 10px 50px; }
+    .login-box { padding: 28px 20px; }
+    .stats-row { grid-template-columns: repeat(2, 1fr); }
+    .item-ops .btn { flex: 1; min-width: calc(50% - 4px); }
+  }
+</style>
+</head>
+<body>
+
+<div class="login-wrap" id="login-view">
+  <div class="login-box">
+    <h1>🛡️ 评论管理后台</h1>
+    <p>dujie-comment · 自托管评论系统</p>
+    <div class="field">
+      <label>API 地址（Worker 域名，缺省为当前页面所在域）</label>
+      <input id="api-input" type="text" placeholder="https://dujie-comment.example.workers.dev" autocomplete="off">
+    </div>
+    <div class="field">
+      <label>管理令牌（X-Admin-Token）</label>
+      <input id="token-input" type="password" placeholder="粘贴部署时生成的管理令牌" autocomplete="off">
+    </div>
+    <button class="btn btn-primary" id="login-btn">进入后台</button>
+    <p class="hint">API 地址保存在 localStorage，令牌仅保存在本浏览器 sessionStorage，关闭标签页即清除，不会上传任何第三方。</p>
+  </div>
+</div>
+
+<div class="app" id="app-view">
+  <div class="topbar">
+    <h1>🛡️ dujie-comment · 评论管理</h1>
+    <div class="ops">
+      <button class="btn btn-ghost btn-sm" id="refresh-btn">⟳ 刷新</button>
+      <button class="btn btn-ghost btn-sm" id="logout-btn">退出</button>
+    </div>
+  </div>
+  <div class="api-bar">
+    <span>API：</span><input id="api-input-2" type="text" autocomplete="off">
+    <button class="btn btn-ghost btn-sm" id="api-save-btn">保存并重载</button>
+  </div>
+  <div class="stats-row" id="stats-row"></div>
+  <div class="tabs">
+    <button class="tab on" data-tab="comments">💬 评论管理</button>
+    <button class="tab" data-tab="bans">🚫 黑名单</button>
+  </div>
+  <div id="tab-comments">
+    <div class="filters">
+      <select id="f-status">
+        <option value="">全部状态</option>
+        <option value="approved">已审核</option>
+        <option value="pending">待审核</option>
+        <option value="hidden">已隐藏</option>
+      </select>
+      <input id="f-slug" type="text" placeholder="文章 slug 筛选（可选）">
+      <input id="f-q" type="text" placeholder="搜索昵称 / 内容">
+      <button class="btn btn-ghost btn-sm" id="f-apply">筛选</button>
+    </div>
+    <div id="comment-list"></div>
+    <div class="pager" id="comment-pager"></div>
+  </div>
+  <div id="tab-bans" style="display:none">
+    <div id="ban-list"></div>
+    <div class="pager" id="ban-pager"></div>
+  </div>
+  <p class="hint">💡 博主回复访客：直接去文章页评论区提交（带管理令牌自动免审直发）。「隐藏」= 软删除，公开面立即不可见；「删除」= 硬删除，其下回复提升为根评论不会跟丢。</p>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  'use strict';
+  var API_KEY_STORAGE = 'dujie-comment-api-base';
+  var TOKEN_KEY = 'dujie-admin-token';
+  // API base 优先级：localStorage（页面顶部可改）> 当前页面 origin > 官方演示站
+  var API = localStorage.getItem(API_KEY_STORAGE) || location.origin || 'https://dujie-comment.dujie.workers.dev';
+  var token = sessionStorage.getItem(TOKEN_KEY) || '';
+  var state = { tab: 'comments', page: 1, total: 0, banPage: 1, banTotal: 0 };
+  var $ = function (id) { return document.getElementById(id); };
+  var loginView = $('login-view'), appView = $('app-view');
+
+  function toast(msg, isErr) {
+    var t = $('toast');
+    t.textContent = msg;
+    t.className = 'toast show' + (isErr ? ' err' : '');
+    setTimeout(function () { t.className = 'toast'; }, 2600);
+  }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function api(path, opts) {
+    opts = opts || {};
+    opts.headers = { 'X-Admin-Token': token };
+    if (opts.body) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(opts.body); }
+    return fetch(API + path, opts).then(function (r) {
+      if (r.status === 401) { sessionStorage.removeItem(TOKEN_KEY); location.reload(); throw new Error('unauthorized'); }
+      return r.json();
+    });
+  }
+  function badge(status) {
+    var map = { approved: '已审核', pending: '待审核', hidden: '已隐藏' };
+    return '<span class="badge ' + esc(status) + '">' + (map[status] || esc(status)) + '</span>';
+  }
+
+  /* ---------- 统计 ---------- */
+  function loadStats() {
+    api('/api/admin/stats').then(function (r) {
+      if (r.code !== 0) return;
+      var d = r.data;
+      $('stats-row').innerHTML =
+        '<div class="stat-card"><div class="n">' + d.approved + '</div><div class="t">已审核</div></div>' +
+        '<div class="stat-card pending"><div class="n">' + d.pending + '</div><div class="t">待审核</div></div>' +
+        '<div class="stat-card"><div class="n">' + d.hidden + '</div><div class="t">已隐藏</div></div>' +
+        '<div class="stat-card"><div class="n">' + d.bans + '</div><div class="t">黑名单</div></div>' +
+        '<div class="stat-card"><div class="n" style="font-size:14px;line-height:32px">' + (d.lastBackupAt ? esc(d.lastBackupAt.slice(0, 10)) : '—') + '</div><div class="t">上次备份</div></div>';
+    }).catch(function () {});
+  }
+
+  /* ---------- 评论列表 ---------- */
+  function loadComments() {
+    var qs = '?page=' + state.page + '&page_size=20';
+    var st = $('f-status').value, sl = $('f-slug').value.trim(), q = $('f-q').value.trim();
+    if (st) qs += '&status=' + encodeURIComponent(st);
+    if (sl) qs += '&slug=' + encodeURIComponent(sl);
+    if (q) qs += '&q=' + encodeURIComponent(q);
+    api('/api/admin/comments' + qs).then(function (r) {
+      if (r.code !== 0) { toast(r.message || '加载失败', true); return; }
+      state.total = r.data.total;
+      var box = $('comment-list');
+      if (!r.data.items.length) { box.innerHTML = '<div class="empty">没有符合条件的评论</div>'; }
+      else {
+        box.innerHTML = r.data.items.map(function (it) {
+          var ops = '';
+          if (it.status !== 'approved') ops += '<button class="btn btn-ok btn-sm" data-op="approve" data-id="' + it.id + '">✓ 审核通过</button>';
+          if (it.status !== 'hidden') ops += '<button class="btn btn-warn btn-sm" data-op="hide" data-id="' + it.id + '">🙈 隐藏</button>';
+          ops += '<button class="btn btn-err btn-sm" data-op="ban" data-id="' + it.id + '">🚫 拉黑</button>';
+          ops += '<button class="btn btn-ghost btn-sm" data-op="del" data-id="' + it.id + '">🗑 删除</button>';
+          return '<div class="item">' +
+            '<div class="item-head"><span class="who">' + esc(it.nickname) + '</span>' + badge(it.status) +
+            '<span>#' + it.id + '</span>' + (it.parentId ? '<span>回复 #' + it.parentId + '</span>' : '') +
+            (it.emailMasked ? '<span>' + esc(it.emailMasked) + '</span>' : '') + '</div>' +
+            '<div class="item-body">' + esc(it.content) + '</div>' +
+            '<div class="item-meta">📄 ' + esc(it.slug) + ' · 🕐 ' + esc(it.createdAt) + ' · ❤️ ' + it.likes + ' · 💬 ' + it.replyCount + ' 回复</div>' +
+            '<div class="item-ops">' + ops + '</div></div>';
+        }).join('');
+      }
+      var pages = Math.max(1, Math.ceil(state.total / 20));
+      $('comment-pager').innerHTML = '<button class="btn btn-ghost btn-sm" id="pg-prev" ' + (state.page <= 1 ? 'disabled' : '') + '>\u2039 上一页</button>' +
+        '<span>第 ' + state.page + ' / ' + pages + ' 页 · 共 ' + state.total + ' 条</span>' +
+        '<button class="btn btn-ghost btn-sm" id="pg-next" ' + (state.page >= pages ? 'disabled' : '') + '>下一页 ›</button>';
+      var prev = $('pg-prev'), next = $('pg-next');
+      if (prev) prev.onclick = function () { state.page--; loadComments(); };
+      if (next) next.onclick = function () { state.page++; loadComments(); };
+    }).catch(function (e) { if (e.message !== 'unauthorized') toast('网络错误', true); });
+  }
+
+  /* ---------- 黑名单 ---------- */
+  function loadBans() {
+    api('/api/admin/bans?page=' + state.banPage + '&page_size=20').then(function (r) {
+      if (r.code !== 0) { toast(r.message || '加载失败', true); return; }
+      state.banTotal = r.data.total;
+      var box = $('ban-list');
+      if (!r.data.items.length) box.innerHTML = '<div class="empty">黑名单为空</div>';
+      else {
+        box.innerHTML = r.data.items.map(function (b) {
+          return '<div class="item"><div class="item-head"><span class="who">' + esc(b.banType === 'email_md5' ? '邮箱' : 'IP') + '</span>' +
+            '<span>' + esc(b.banValueMasked) + '</span></div>' +
+            (b.reason ? '<div class="item-body">原因：' + esc(b.reason) + '</div>' : '') +
+            '<div class="item-meta">🕐 ' + esc(b.createdAt) + '</div>' +
+            '<div class="item-ops"><button class="btn btn-ghost btn-sm" data-op="unban" data-id="' + b.id + '">解除拉黑</button></div></div>';
+        }).join('');
+      }
+      var pages = Math.max(1, Math.ceil(state.banTotal / 20));
+      $('ban-pager').innerHTML = '<button class="btn btn-ghost btn-sm" id="bprev" ' + (state.banPage <= 1 ? 'disabled' : '') + '>‹ 上一页</button>' +
+        '<span>第 ' + state.banPage + ' / ' + pages + ' 页 · 共 ' + state.banTotal + ' 条</span>' +
+        '<button class="btn btn-ghost btn-sm" id="bnext" ' + (state.banPage >= pages ? 'disabled' : '') + '>下一页 ›</button>';
+      var prev = $('bprev'), next = $('bnext');
+      if (prev) prev.onclick = function () { state.banPage--; loadBans(); };
+      if (next) next.onclick = function () { state.banPage++; loadBans(); };
+    }).catch(function () {});
+  }
+
+  /* ---------- 操作（事件委托） ---------- */
+  document.addEventListener('click', function (ev) {
+    var btn = ev.target.closest('button[data-op]');
+    if (!btn) return;
+    var op = btn.getAttribute('data-op'), id = btn.getAttribute('data-id');
+    if (op === 'approve') {
+      api('/api/admin/comments/' + id + '/approve', { method: 'POST', body: {} }).then(function (r) {
+        toast(r.code === 0 ? '已审核通过' : (r.message || '操作失败'), r.code !== 0);
+        if (r.code === 0) { loadComments(); loadStats(); }
+      });
+    } else if (op === 'hide') {
+      api('/api/admin/comments/' + id + '/hide', { method: 'POST', body: {} }).then(function (r) {
+        toast(r.code === 0 ? '已隐藏' : (r.message || '操作失败'), r.code !== 0);
+        if (r.code === 0) { loadComments(); loadStats(); }
+      });
+    } else if (op === 'del') {
+      if (!confirm('确认硬删除 #' + id + '？其下回复会被提升为根评论，不会删除。')) return;
+      api('/api/admin/comments/' + id, { method: 'DELETE' }).then(function (r) {
+        toast(r.code === 0 ? '已删除' : (r.message || '操作失败'), r.code !== 0);
+        if (r.code === 0) { loadComments(); loadStats(); }
+      });
+    } else if (op === 'ban') {
+      var reason = prompt('拉黑原因（可留空）：', '');
+      if (reason === null) return;
+      api('/api/admin/comments/' + id + '/ban', { method: 'POST', body: { scope: 'both', reason: reason } }).then(function (r) {
+        toast(r.code === 0 ? '已拉黑（邮箱+IP）' : (r.message || '操作失败'), r.code !== 0);
+        if (r.code === 0) { loadStats(); }
+      });
+    } else if (op === 'unban') {
+      api('/api/admin/bans/' + id, { method: 'DELETE' }).then(function (r) {
+        toast(r.code === 0 ? '已解除' : (r.message || '操作失败'), r.code !== 0);
+        if (r.code === 0) { loadBans(); loadStats(); }
+      });
+    }
+  });
+
+  /* ---------- tab / 筛选 / 登录 ---------- */
+  var tabs = document.querySelectorAll('.tab');
+  tabs.forEach(function (t) {
+    t.onclick = function () {
+      tabs.forEach(function (x) { x.classList.remove('on'); });
+      t.classList.add('on');
+      state.tab = t.getAttribute('data-tab');
+      $('tab-comments').style.display = state.tab === 'comments' ? '' : 'none';
+      $('tab-bans').style.display = state.tab === 'bans' ? '' : 'none';
+      if (state.tab === 'bans') loadBans();
+    };
+  });
+  $('f-apply').onclick = function () { state.page = 1; loadComments(); };
+  $('f-q').addEventListener('keydown', function (e) { if (e.key === 'Enter') { state.page = 1; loadComments(); } });
+  $('refresh-btn').onclick = function () { loadStats(); if (state.tab === 'bans') loadBans(); else loadComments(); };
+  $('logout-btn').onclick = function () { sessionStorage.removeItem(TOKEN_KEY); location.reload(); };
+
+  function saveApiBase() {
+    var v = $('api-input-2').value.trim().replace(/\/+$/, '');
+    if (v) localStorage.setItem(API_KEY_STORAGE, v);
+    location.reload();
+  }
+  $('api-save-btn').onclick = saveApiBase;
+  $('api-input-2').addEventListener('keydown', function (e) { if (e.key === 'Enter') saveApiBase(); });
+
+  $('login-btn').onclick = function () {
+    var base = $('api-input').value.trim().replace(/\/+$/, '');
+    if (base) localStorage.setItem(API_KEY_STORAGE, base);
+    var v = $('token-input').value.trim();
+    if (!v) { toast('请输入令牌', true); return; }
+    token = v;
+    sessionStorage.setItem(TOKEN_KEY, v);
+    enterApp();
+  };
+  $('token-input').addEventListener('keydown', function (e) { if (e.key === 'Enter') $('login-btn').click(); });
+
+  function enterApp() {
+    loginView.style.display = 'none';
+    appView.style.display = 'block';
+    $('api-input-2').value = API;
+    loadStats();
+    loadComments();
+  }
+
+  if (token) enterApp();
+})();
+</script>
+</body>
+</html>

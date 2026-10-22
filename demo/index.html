@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>dujie-comment · 在线演示</title>
+<style>
+  :root {
+    --bg: #0b0f1a; --card: #151d2e; --border: #233049;
+    --text: #e5e9f0; --text-2: #9aa7bd; --text-3: #64748b;
+    --accent: #38bdf8; --grad: linear-gradient(135deg, #38bdf8, #818cf8);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; background: var(--bg); color: var(--text); }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 40px 16px 80px; }
+  .hero { text-align: center; margin-bottom: 28px; }
+  .hero h1 { font-size: 26px; background: var(--grad); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+  .hero p { color: var(--text-3); font-size: 13.5px; margin-top: 8px; }
+  .hero .links { margin-top: 14px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  .hero .links a {
+    font-size: 13px; color: var(--accent); text-decoration: none;
+    border: 1px solid var(--border); border-radius: 999px; padding: 7px 16px; transition: border-color .2s;
+  }
+  .hero .links a:hover { border-color: var(--accent); }
+  .article { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 26px 24px; }
+  .article h2 { font-size: 20px; margin-bottom: 8px; }
+  .article .meta { font-size: 12.5px; color: var(--text-3); margin-bottom: 16px; }
+  .article .body { font-size: 14.5px; color: var(--text-2); line-height: 1.8; }
+  .article .body p { margin-bottom: 12px; }
+  .slug-pills { display: flex; gap: 8px; flex-wrap: wrap; margin: 18px 0 0; }
+  .slug-pills a { font-size: 12.5px; color: var(--text-2); text-decoration: none; border: 1px solid var(--border); border-radius: 999px; padding: 5px 13px; }
+  .slug-pills a:hover { color: var(--accent); border-color: var(--accent); }
+  .slug-pills a.on { color: #fff; background: var(--grad); border-color: transparent; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hero">
+    <h1>dujie-comment 在线演示</h1>
+    <p>Cloudflare Workers + D1 零成本评论系统 · 下方为真实嵌入式评论区，数据来自演示数据库</p>
+    <div class="links">
+      <a href="/admin">🛡️ 管理后台</a>
+      <a href="https://github.com/gjsvip/dujie-comment" target="_blank" rel="noopener">📦 GitHub 仓库</a>
+      <a href="https://github.com/gjsvip/dujie-comment#readme" target="_blank" rel="noopener">📖 部署文档</a>
+    </div>
+  </div>
+
+  <article class="article">
+    <h2 id="post-title">演示文章</h2>
+    <div class="meta" id="post-meta">slug：demo-post-1 · 2026-10-22</div>
+    <div class="body">
+      <p>这是一个挂在 Cloudflare Worker 上的演示文章页。评论区由 <code>dujie-comment.js</code> 渲染：树形回复、点赞、Gravatar 头像、待审核状态机全部可用。</p>
+      <p>试试发表一条评论，或点击任意评论的「回复」按钮——你的数据会真实写入演示 D1 数据库，并在管理后台可见。</p>
+    </div>
+    <div class="slug-pills" id="slug-pills"></div>
+
+    <!-- 评论区挂载点：data-api 指向本 Worker，data-slug 支持 ?slug= 切换 -->
+    <div data-dujie-comment
+         data-api=""
+         data-slug=""
+         data-author="dujie,博主"
+         data-title="评论"
+         data-post-stats="1"></div>
+  </article>
+</div>
+
+<link rel="stylesheet" href="/client/dujie-comment.css">
+<script>
+  // 演示页初始化：API base = 当前域；slug 取 ?slug= 或标题映射
+  (function () {
+    var TITLES = { 'demo-post-1': '演示文章一：欢迎页', 'demo-post-2': '演示文章二：部署心得', 'hello-world': 'Hello World' };
+    var params = new URLSearchParams(location.search);
+    var slug = params.get('slug') || 'demo-post-1';
+    var mount = document.querySelector('[data-dujie-comment]');
+    mount.setAttribute('data-api', location.origin);
+    mount.setAttribute('data-slug', slug);
+    document.getElementById('post-title').textContent = TITLES[slug] || '演示文章';
+    document.getElementById('post-meta').textContent = 'slug：' + slug + ' · 2026-10-22';
+    var pills = document.getElementById('slug-pills');
+    Object.keys(TITLES).forEach(function (s) {
+      var a = document.createElement('a');
+      a.href = '/demo?slug=' + encodeURIComponent(s);
+      a.textContent = s;
+      if (s === slug) a.className = 'on';
+      pills.appendChild(a);
+    });
+  })();
+</script>
+<script src="/client/dujie-comment.js" defer></script>
+</body>
+</html>
