@@ -135,17 +135,23 @@ npm run typecheck  # tsc --noEmit
 
 ```
 dujie-comment/
-├── worker/               # Cloudflare Worker（Hono + TypeScript 严格模式）
-│   ├── index.ts          #   入口：中间件链 / 路由挂载 / cron 周备份
-│   ├── routes/           #   comments（公开 API）/ admin（管理 API）/ backup / static
-│   └── lib/              #   security（指纹/限流/Turnstile/令牌）/ config（KV 开关）/ notify（Resend）
-├── schema.sql            # D1 建表（幂等）
-├── wrangler.toml         # D1/KV/R2 + cron + CORS_ORIGINS（示例值，全部可配）
-├── client/               # 嵌入组件（vanilla JS，零构建，即引即用）
-├── admin/index.html      # 管理后台（单文件，token 模式）
-├── demo/index.html       # 在线演示页
-├── docs/                 # 部署文档 + API 契约
-└── tests/                # Vitest 单测
+├── worker/                    # Cloudflare Worker（Hono + TypeScript 严格模式）
+│   ├── index.ts               #   入口：中间件链 / 路由挂载 / cron 周备份
+│   ├── routes/                #   comments（公开 API）/ admin（管理 API）/ backup / static
+│   ├── lib/                   #   security（指纹/限流/Turnstile/令牌）/ config（KV 开关）/ notify（Resend）
+│   ├── types.ts               #   Env 绑定与 Hono 上下文类型
+│   └── raw.d.ts               #   文本模块导入类型声明
+├── client/                    # 嵌入组件（vanilla JS，零构建，即引即用）
+│   ├── dujie-comment.js
+│   └── dujie-comment.css
+├── admin/index.html           # 管理后台（单文件，token 模式，API 地址可改）
+├── demo/index.html            # 在线演示页
+├── docs/                      # 部署指南 + API 契约
+├── tests/                     # Vitest：单测（全 mock）+ 集成测（node:sqlite 真库）
+├── scripts/push-to-github.mjs # 经 Git Data API 推送仓库（免 git 协议）
+├── .github/workflows/         # CI：test → deploy → 线上冒烟（部署后自验证）
+├── schema.sql                 # D1 建表（幂等）
+└── wrangler.toml              # D1/KV/R2 + cron + CORS_ORIGINS（示例值，全部可配）
 ```
 
 ## 技术栈
