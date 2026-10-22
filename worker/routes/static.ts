@@ -20,13 +20,15 @@ const staticRoutes = new Hono()
 /** 嵌入组件 JS（公开，可被任意页面 <script src> 引用） */
 staticRoutes.get('/client/dujie-comment.js', (c) => {
   c.header('Cache-Control', 'public, max-age=600')
-  return c.text(clientJs)
+  c.header('Content-Type', 'text/javascript; charset=utf-8')
+  return c.body(clientJs)
 })
 
 /** 嵌入组件 CSS（暗/亮双主题，CSS 变量驱动） */
 staticRoutes.get('/client/dujie-comment.css', (c) => {
   c.header('Cache-Control', 'public, max-age=600')
-  return c.text(clientCss)
+  c.header('Content-Type', 'text/css; charset=utf-8')
+  return c.body(clientCss)
 })
 
 /** 管理后台（token 模式，API base 页面顶部可改） */
